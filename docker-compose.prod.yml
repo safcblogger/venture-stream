@@ -1,0 +1,22 @@
+# Example production stack. Put a TLS-terminating reverse proxy in front and set APP_URL to the https origin.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: venture
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: venture_stream
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on: [db]
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgres://venture:${POSTGRES_PASSWORD}@db:5432/venture_stream
+    ports:
+      - "3000:3000"
+volumes:
+  pgdata:

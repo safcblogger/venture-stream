@@ -23,7 +23,7 @@ export interface SearchProvider {
 
 class TavilyProvider implements SearchProvider {
   readonly name = "Tavily";
-  constructor(private readonly apiKey: string) {}
+  constructor(private readonly apiKey: string, private readonly baseUrl = "https://api.tavily.com") {}
 
   private headers() {
     return { authorization: `Bearer ${this.apiKey}` };
@@ -31,7 +31,7 @@ class TavilyProvider implements SearchProvider {
 
   async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
     const data = await fetchJson<{ results?: { title?: string; url?: string; content?: string }[] }>(
-      "https://api.tavily.com/search",
+      `${this.baseUrl}/search`,
       {
         service: "Tavily web search",
         headers: this.headers(),
@@ -55,7 +55,7 @@ class TavilyProvider implements SearchProvider {
   async extract(urls: string[]): Promise<{ url: string; content: string }[]> {
     if (urls.length === 0) return [];
     const data = await fetchJson<{ results?: { url?: string; raw_content?: string }[] }>(
-      "https://api.tavily.com/extract",
+      `${this.baseUrl}/extract`,
       { service: "Tavily page extraction", headers: this.headers(), timeoutMs: 45_000, body: { urls } },
     );
     if (!Array.isArray(data.results)) {
@@ -66,13 +66,13 @@ class TavilyProvider implements SearchProvider {
 }
 
 export function getSearchProvider(): SearchProvider {
-  const { SEARCH_PROVIDER, TAVILY_API_KEY } = env();
+  const { SEARCH_PROVIDER, TAVILY_API_KEY, TAVILY_BASE_URL } = env();
   switch (SEARCH_PROVIDER) {
     case "tavily":
       if (!TAVILY_API_KEY) {
         throw new AppError("not_configured", "Web search is not configured. Set TAVILY_API_KEY on the server to enable discovery and research.");
       }
-      return new TavilyProvider(TAVILY_API_KEY);
+      return new TavilyProvider(TAVILY_API_KEY, TAVILY_BASE_URL);
     default:
       throw new AppError("not_configured", `Unknown search provider "${SEARCH_PROVIDER}".`);
   }

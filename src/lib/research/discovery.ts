@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { AppError, toUserMessage } from "@/lib/errors";
@@ -172,4 +172,28 @@ export async function runDiscovery(scope: Scope, runId: string, deps: ResearchDe
       .where(eq(schema.discoveryRuns.id, runId));
     throw err;
   }
+}
+
+export async function listDiscoveryRuns(scope: Scope, limit = 8) {
+  const runs = await db
+    .select()
+    .from(schema.discoveryRuns)
+    .where(eq(schema.discoveryRuns.workspaceId, scope.workspaceId))
+    .orderBy(desc(schema.discoveryRuns.createdAt))
+    .limit(limit);
+  if (runs.length === 0) return [];
+  const found = await db
+    .select({
+      id: schema.prospects.id,
+      runId: schema.prospects.discoveryRunId,
+      name: schema.prospects.name,
+      domain: schema.prospects.domain,
+      score: schema.prospects.opportunityScore,
+      researchStatus: schema.prospects.researchStatus,
+      sourceUrl: schema.prospects.discoverySourceUrl,
+    })
+    .from(schema.prospects)
+    .where(and(eq(schema.prospects.workspaceId, scope.workspaceId), inArray(schema.prospects.discoveryRunId, runs.map((r) => r.id))))
+    .orderBy(desc(schema.prospects.createdAt));
+  return runs.map((r) => ({ ...r, prospects: found.filter((f) => f.runId === r.id) }));
 }

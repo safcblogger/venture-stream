@@ -67,7 +67,7 @@ export async function reports(scope: Scope) {
       .select({
         source: sql<string>`coalesce(${p.discoverySource}, 'unknown')`,
         prospects: sql<number>`count(distinct ${p.id})::int`,
-        avgScore: sql<number | null>`round(avg(${p.opportunityScore}))::int`,
+        avgScore: sql<number | null>`(select round(avg(p2.opportunity_score))::int from prospects p2 where p2.workspace_id = ${ws} and p2.discovery_source = ${p.discoverySource})`,
         deals: sql<number>`count(${d.id})::int`,
         pipelineValue: sql<number>`coalesce(sum(coalesce(${d.proposalValue}, ${d.estimatedValue}, 0)) filter (where ${d.status} in ('open','proposal')), 0)::float8`,
         revenue: sql<number>`coalesce(sum(${d.wonValue}) filter (where ${d.status} = 'won'), 0)::float8`,

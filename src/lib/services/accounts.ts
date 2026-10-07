@@ -54,9 +54,9 @@ const attempts = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 15 * 60_000;
 const MAX_ATTEMPTS = 8;
 
-export function checkLoginThrottle(key: string, now = Date.now()) {
+export function checkLoginThrottle(key: string, now = Date.now(), max = MAX_ATTEMPTS) {
   const entry = attempts.get(key);
-  if (entry && entry.resetAt > now && entry.count >= MAX_ATTEMPTS) {
+  if (entry && entry.resetAt > now && entry.count >= max) {
     throw new AppError("rate_limit", "Too many sign-in attempts. Please wait a few minutes and try again.");
   }
 }

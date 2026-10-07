@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { AppError } from "./errors";
 import { env } from "./env";
@@ -16,6 +16,7 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function createSession(userId: string) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
+  await db.delete(schema.sessions).where(and(eq(schema.sessions.userId, userId), lt(schema.sessions.expiresAt, new Date())));
   await db.insert(schema.sessions).values({ userId, tokenHash: sha256(token), expiresAt });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {

@@ -5,9 +5,12 @@ const schema = z.object({
   APP_URL: z.string().default("http://localhost:3000"),
   AI_PROVIDER: z.string().default("openai"),
   OPENAI_API_KEY: z.string().optional(),
+  OPENAI_BASE_URL: z.string().default("https://api.openai.com/v1"),
   OPENAI_MODEL: z.string().default("gpt-5-mini"),
   SEARCH_PROVIDER: z.string().default("tavily"),
   TAVILY_API_KEY: z.string().optional(),
+  TAVILY_BASE_URL: z.string().default("https://api.tavily.com"),
+  ALLOW_REGISTRATION: z.string().default("true"),
   WORKER_ENABLED: z.string().default("true"),
 });
 

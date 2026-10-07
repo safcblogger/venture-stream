@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file=.env --import tsx src/db/migrate-cli.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:all": "npm run typecheck && npm test",
+    "db:up": "docker compose up -d"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",

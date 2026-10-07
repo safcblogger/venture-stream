@@ -391,3 +391,38 @@ export async function distinctPlatforms(scope: Scope) {
     .orderBy(p.ecommercePlatform);
   return rows.map((r) => r.v!).filter(Boolean);
 }
+
+const BOARD_LIMIT = 30;
+
+/** Pipeline board: top prospects per stage with last activity and next open task, plus stage totals. */
+export async function pipelineBoard(scope: Scope) {
+  const stages = await Promise.all(
+    PIPELINE_STAGES.map(async (stage) => {
+      const [rows, [agg]] = await Promise.all([
+        db
+          .select({
+            id: p.id,
+            name: p.name,
+            domain: p.domain,
+            score: p.opportunityScore,
+            value: p.estimatedValue,
+            assignedName: schema.users.name,
+            lastActivity: sql<Date | null>`(select max(a.created_at) from activities a where a.prospect_id = ${p.id})`,
+            nextTaskTitle: sql<string | null>`(select t.title from tasks t where t.prospect_id = ${p.id} and t.status <> 'complete' order by t.due_date asc nulls last, t.created_at limit 1)`,
+            nextTaskDue: sql<string | null>`(select t.due_date::text from tasks t where t.prospect_id = ${p.id} and t.status <> 'complete' order by t.due_date asc nulls last, t.created_at limit 1)`,
+          })
+          .from(p)
+          .leftJoin(schema.users, eq(schema.users.id, p.assignedUserId))
+          .where(and(eq(p.workspaceId, scope.workspaceId), eq(p.pipelineStage, stage)))
+          .orderBy(sql`${p.opportunityScore} desc nulls last`, desc(p.updatedAt))
+          .limit(BOARD_LIMIT),
+        db
+          .select({ total: sql<number>`count(*)::int`, value: sql<number>`coalesce(sum(${p.estimatedValue}), 0)::float8` })
+          .from(p)
+          .where(and(eq(p.workspaceId, scope.workspaceId), eq(p.pipelineStage, stage))),
+      ]);
+      return { stage, total: agg.total, value: agg.value, rows: rows.map((r) => ({ ...r, lastActivity: r.lastActivity ? new Date(r.lastActivity).toISOString() : null })) };
+    }),
+  );
+  return stages;
+}

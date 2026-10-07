@@ -4,7 +4,7 @@ import { AppError, toUserMessage } from "@/lib/errors";
 import { getAiProvider } from "@/lib/providers/ai";
 import { getSearchProvider } from "@/lib/providers/search";
 import { runDiscovery } from "@/lib/research/discovery";
-import { researchProspect, type ResearchDeps } from "@/lib/research/research";
+import { findDecisionMakers, researchProspect, type ResearchDeps } from "@/lib/research/research";
 import { claimJob, completeJob, failJob, recoverStaleJobs } from "./queue";
 
 type Job = typeof schema.jobs.$inferSelect;
@@ -19,6 +19,9 @@ export async function runJob(job: Job, deps: ResearchDeps) {
       return;
     case "research":
       await researchProspect(scope, payload.prospectId!, deps);
+      return;
+    case "contacts":
+      await findDecisionMakers(scope, payload.prospectId!, deps);
       return;
     default:
       throw new AppError("validation", `Unknown job type ${job.type}`);

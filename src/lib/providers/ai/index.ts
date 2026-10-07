@@ -42,7 +42,7 @@ export interface AiProvider {
 
 class OpenAiProvider implements AiProvider {
   readonly name = "OpenAI";
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly apiKey: string, private readonly model: string, private readonly baseUrl = "https://api.openai.com/v1") {}
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
     const messages = req.messages.map((m) => {
@@ -60,7 +60,7 @@ class OpenAiProvider implements AiProvider {
     });
     const data = await fetchJson<{
       choices?: { message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] } }[];
-    }>("https://api.openai.com/v1/chat/completions", {
+    }>(`${this.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
       service: "OpenAI",
       headers: { authorization: `Bearer ${this.apiKey}` },
       timeoutMs: req.timeoutMs ?? 90_000,
@@ -83,14 +83,16 @@ class OpenAiProvider implements AiProvider {
   }
 }
 
+export { OpenAiProvider };
+
 export function getAiProvider(): AiProvider {
-  const { AI_PROVIDER, OPENAI_API_KEY, OPENAI_MODEL } = env();
+  const { AI_PROVIDER, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL } = env();
   switch (AI_PROVIDER) {
     case "openai":
       if (!OPENAI_API_KEY) {
         throw new AppError("not_configured", "The AI provider is not configured. Set OPENAI_API_KEY on the server to enable AI features.");
       }
-      return new OpenAiProvider(OPENAI_API_KEY, OPENAI_MODEL);
+      return new OpenAiProvider(OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL);
     default:
       throw new AppError("not_configured", `Unknown AI provider "${AI_PROVIDER}".`);
   }

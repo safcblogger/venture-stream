@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
-export type JobType = "discovery" | "research";
+export type JobType = "discovery" | "research" | "contacts";
 
 export async function enqueueJob(job: { type: JobType; workspaceId: string; payload: Record<string, unknown>; runAt?: Date }) {
   const [row] = await db
