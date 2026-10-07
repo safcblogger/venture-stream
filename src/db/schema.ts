@@ -125,6 +125,7 @@ export const discoveryRuns = pgTable(
     status: runStatusEnum("status").notNull().default("queued"),
     error: text("error"),
     resultsCount: integer("results_count").notNull().default(0),
+    stats: jsonb("stats"),
     createdAt: createdAt(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },

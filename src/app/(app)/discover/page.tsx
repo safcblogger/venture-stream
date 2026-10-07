@@ -5,9 +5,23 @@ import { Empty, PageHead, Score } from "@/components/ui";
 import { requireContext } from "@/lib/auth";
 import { secretStatus } from "@/lib/secrets";
 import { safeHref, timeAgo } from "@/lib/format";
-import { listDiscoveryRuns } from "@/lib/research/discovery";
+import { listDiscoveryRuns, type DiscoveryStats } from "@/lib/research/discovery";
 
 export const metadata = { title: "Discover" };
+
+/** Plain-language account of what a run did, so an empty result is never a mystery. */
+function RunSummary({ s }: { s: DiscoveryStats }) {
+  const parts = [
+    `Searched the web ${s.queries} ways (${s.searchResults} results${s.pagesRead ? `, read ${s.pagesRead} list pages in full` : ""})`,
+    `${s.candidatesNamed} companies named`,
+    `${s.domainsFromSource + s.domainsResolved} with a confirmed website${s.unresolved ? `, ${s.unresolved} dropped because no website could be confirmed` : ""}`,
+  ];
+  if (s.platformRequired) {
+    parts.push(`checked each site for ${s.platformRequired}: ${s.platformMatched} matched, ${s.platformRejected} run something else${s.unreachable ? `, ${s.unreachable} could not be loaded` : ""}`);
+  }
+  if (s.alreadyInWorkspace) parts.push(`${s.alreadyInWorkspace} already in your workspace`);
+  return <div className="card-body faint">{parts.join(" → ")}.</div>;
+}
 
 export default async function DiscoverPage() {
   const ctx = await requireContext();
@@ -44,6 +58,7 @@ export default async function DiscoverPage() {
                 <span className={`badge ${r.status === "done" ? "ok" : r.status === "failed" ? "danger" : "info"}`}>{r.status === "done" ? `${r.resultsCount} new` : r.status}</span>
               </div>
               {r.status === "failed" && <div className="card-body"><div className="alert error">{r.error ?? "Discovery failed."}</div></div>}
+              {r.status === "done" && r.stats ? <RunSummary s={r.stats as DiscoveryStats} /> : null}
               {r.status === "done" && r.prospects.length === 0 && (
                 <div className="card-body muted">No new companies were found that could be verified against their sources. Try rephrasing or being more specific.</div>
               )}

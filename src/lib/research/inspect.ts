@@ -29,6 +29,8 @@ const PLATFORMS: { name: string; ecommerce: boolean; tests: RegExp[] }[] = [
   { name: "Webflow", ecommerce: false, tests: [/assets\.website-files\.com/i, /webflow\.js/i] },
 ];
 
+export const DETECTABLE_PLATFORMS = PLATFORMS.map((p) => p.name);
+
 const TECH: { name: string; test: RegExp }[] = [
   { name: "Google Tag Manager", test: /googletagmanager\.com\/gtm\.js|GTM-[A-Z0-9]+/ },
   { name: "Google Analytics 4", test: /gtag\/js\?id=G-|['"]G-[A-Z0-9]{6,}['"]/ },

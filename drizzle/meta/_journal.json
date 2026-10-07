@@ -15,6 +15,13 @@
       "when": 1791346260316,
       "tag": "0001_steep_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791346741026,
+      "tag": "0002_tidy_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

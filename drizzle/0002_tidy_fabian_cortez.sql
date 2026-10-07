@@ -1,0 +1,1 @@
+ALTER TABLE "discovery_runs" ADD COLUMN "stats" jsonb;

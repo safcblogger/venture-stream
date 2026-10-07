@@ -353,3 +353,47 @@ describe("AI assistant grounding", () => {
     expect(byName.entities).toEqual([]);
   });
 });
+
+describe("discovery v2: resolving websites and verifying platforms", () => {
+  it("matches brand names to domains sensibly", async () => {
+    const { domainMatchesBrand } = await import("@/lib/research/discovery");
+    expect(domainMatchesBrand("rab.equipment", "Rab Equipment")).toBe(true);
+    expect(domainMatchesBrand("www.fatface.com", "FatFace")).toBe(true);
+    expect(domainMatchesBrand("the-white-company.co.uk", "The White Company")).toBe(true);
+    expect(domainMatchesBrand("randomblog.com", "Rab Equipment")).toBe(false);
+    expect(domainMatchesBrand("ab.com", "Rab")).toBe(false);
+  });
+
+  it("finds sites for named companies, then keeps only those on the required platform", async () => {
+    const s = await newWorkspace();
+    const run = await createDiscoveryRun(s, "UK retailers using WooCommerce that could move to Shopify");
+    const search = {
+      name: "fake",
+      search: async (q: string) => {
+        if (/official website/.test(q)) {
+          if (/Alpha Outdoors/.test(q)) return [{ title: "Alpha Outdoors", url: "https://www.alphaoutdoors.co.uk/", content: "x" }, { title: "wiki", url: "https://en.wikipedia.org/wiki/Alpha", content: "x" }];
+          if (/Beta Home/.test(q)) return [{ title: "Beta Home", url: "https://betahome.co.uk/", content: "x" }];
+          return [{ title: "unrelated", url: "https://somethingelse.com/", content: "x" }];
+        }
+        return [{ title: "Best UK independent retailers", url: "https://list.test/uk", content: "Alpha Outdoors, Beta Home and Ghost Brand are great." }];
+      },
+      extract: async () => [{ url: "https://list.test/uk", content: "Full list: Alpha Outdoors, Beta Home, Ghost Brand" }],
+    };
+    const ai = fakeAi((req) => {
+      const sys = req.messages[0].content as string;
+      if (sys.startsWith("You turn")) return { content: JSON.stringify({ summary: "UK WooCommerce retailers", searchQueries: ["best uk independent retailers"], requiredPlatform: "WooCommerce" }) };
+      return { content: JSON.stringify({ companies: [
+        { name: "Alpha Outdoors", website: null, reason: "Outdoor retailer", sourceId: "E1" },
+        { name: "Beta Home", website: null, reason: "Homeware retailer", sourceId: "E1" },
+        { name: "Ghost Brand", website: null, reason: "Named in list", sourceId: "E1" },
+      ] }) };
+    });
+    const checkSite = async (url: string) => (url.includes("alphaoutdoors") ? { reachable: true, platform: "WooCommerce" } : { reachable: true, platform: "Shopify" });
+    const created = await runDiscovery(s, run.id, { search, ai, checkSite });
+    expect(created).toBe(1); // Beta runs Shopify (rejected); Ghost Brand has no matching domain (dropped)
+    const [r] = await db.select().from(schema.discoveryRuns).where(eq(schema.discoveryRuns.id, run.id));
+    expect(r.stats).toMatchObject({ candidatesNamed: 3, domainsResolved: 2, unresolved: 1, platformRequired: "WooCommerce", platformMatched: 1, platformRejected: 1, created: 1 });
+    const rows = await db.select().from(schema.prospects).where(eq(schema.prospects.workspaceId, s.workspaceId));
+    expect(rows.map((p) => [p.domain, p.ecommercePlatform])).toEqual([["alphaoutdoors.co.uk", "WooCommerce"]]);
+  });
+});
