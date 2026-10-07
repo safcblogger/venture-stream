@@ -10,6 +10,7 @@ const schema = z.object({
   SEARCH_PROVIDER: z.string().default("tavily"),
   TAVILY_API_KEY: z.string().optional(),
   TAVILY_BASE_URL: z.string().default("https://api.tavily.com"),
+  SECRETS_KEY: z.string().optional(),
   ALLOW_REGISTRATION: z.string().default("true"),
   WORKER_ENABLED: z.string().default("true"),
 });

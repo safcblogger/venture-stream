@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       { workspaceId: ctx.workspace.id, userId: ctx.user.id },
       ctx.workspace.name,
       { conversationId: parsed.data.conversationId, message: parsed.data.message },
-      getAiProvider(),
+      await getAiProvider(ctx.workspace.id),
     );
   });
 }

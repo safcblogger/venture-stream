@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/errors";
 import { env } from "@/lib/env";
 import { fetchJson } from "@/lib/http";
+import { getSecret } from "@/lib/secrets";
 
 export interface SearchResult {
   title: string;
@@ -65,12 +66,13 @@ class TavilyProvider implements SearchProvider {
   }
 }
 
-export function getSearchProvider(): SearchProvider {
-  const { SEARCH_PROVIDER, TAVILY_API_KEY, TAVILY_BASE_URL } = env();
+export async function getSearchProvider(workspaceId?: string): Promise<SearchProvider> {
+  const { SEARCH_PROVIDER, TAVILY_BASE_URL } = env();
+  const TAVILY_API_KEY = (workspaceId ? await getSecret(workspaceId, "tavily_api_key") : null) ?? env().TAVILY_API_KEY;
   switch (SEARCH_PROVIDER) {
     case "tavily":
       if (!TAVILY_API_KEY) {
-        throw new AppError("not_configured", "Web search is not configured. Set TAVILY_API_KEY on the server to enable discovery and research.");
+        throw new AppError("not_configured", "Web search is not configured. Add your Tavily API key in Settings → Integrations to enable discovery and research.");
       }
       return new TavilyProvider(TAVILY_API_KEY, TAVILY_BASE_URL);
     default:

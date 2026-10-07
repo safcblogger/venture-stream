@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
-import { addMemberAction, removeMemberAction } from "@/app/actions";
+import { addMemberAction, removeMemberAction, removeSecretAction, saveSecretAction } from "@/app/actions";
+import { secretStatus } from "@/lib/secrets";
 import { ActionButton, ActionForm } from "@/components/action";
 import { PageHead } from "@/components/ui";
 import { requireContext } from "@/lib/auth";
@@ -13,9 +14,10 @@ export default async function SettingsPage() {
   const members = await listMembers(ctx.workspace.id);
   const canManage = ctx.role !== "member";
   const e = env();
+  const status = await secretStatus(ctx.workspace.id);
   const integrations = [
-    { name: "AI provider", detail: `${e.AI_PROVIDER} · ${e.OPENAI_MODEL}`, ok: Boolean(e.OPENAI_API_KEY), key: "OPENAI_API_KEY" },
-    { name: "Web search", detail: e.SEARCH_PROVIDER, ok: Boolean(e.TAVILY_API_KEY), key: "TAVILY_API_KEY" },
+    { name: "OpenAI (AI assistant, research, outreach)", detail: `model ${e.OPENAI_MODEL}`, secret: "openai_api_key" as const, help: "platform.openai.com → API keys" },
+    { name: "Tavily (web search for discovery and research)", detail: "tavily.com → API keys", secret: "tavily_api_key" as const, help: "app.tavily.com" },
   ];
   return (
     <>
@@ -50,17 +52,29 @@ export default async function SettingsPage() {
         </section>
         <section className="card">
           <div className="card-head"><h2>Integrations</h2></div>
-          <table className="table">
-            <tbody>
-              {integrations.map((i) => (
-                <tr key={i.name}>
-                  <td><strong>{i.name}</strong><div className="faint">{i.detail}</div></td>
-                  <td>{i.ok ? <span className="badge ok">Configured</span> : <span className="badge danger">Missing {i.key}</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="card-body faint">API keys are server-side environment variables and are never sent to the browser. Change them in the deployment environment.</div>
+          <div className="card-body stack">
+            {integrations.map((i) => {
+              const s = status[i.secret];
+              return (
+                <div key={i.secret} className="stack" style={{ paddingBottom: 12, borderBottom: "1px solid var(--border)" }}>
+                  <div className="row between">
+                    <div><strong>{i.name}</strong><div className="faint">{i.detail}</div></div>
+                    {s.source === "app" ? <span className="badge ok">Saved · ends {s.last4}</span> : s.source === "env" ? <span className="badge ok">Set on server</span> : <span className="badge danger">Not set</span>}
+                  </div>
+                  {canManage ? (
+                    <>
+                      <ActionForm action={saveSecretAction.bind(null, i.secret)} submit={s.source === "app" ? "Replace key" : "Save key"} inline>
+                        <input name="value" type="password" autoComplete="off" spellCheck={false} placeholder={`Paste your ${i.secret === "openai_api_key" ? "OpenAI" : "Tavily"} API key`} aria-label={`${i.name} API key`} required />
+                      </ActionForm>
+                      {s.source === "app" && <div><ActionButton className="btn sm ghost danger" confirm="Remove this saved key?" action={removeSecretAction.bind(null, i.secret)}>Remove saved key</ActionButton></div>}
+                    </>
+                  ) : <div className="faint">Only owners and admins can change keys.</div>}
+                  <div className="faint">Get one at {i.help}</div>
+                </div>
+              );
+            })}
+            <div className="faint">Keys are encrypted before they&apos;re stored and are never shown again or sent to your browser. Anything you save here overrides a server setting.</div>
+          </div>
         </section>
       </div>
     </>

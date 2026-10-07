@@ -21,6 +21,8 @@ import {
 import { createTask, deleteTask, setTaskStatus } from "@/lib/services/tasks";
 import { addMemberByEmail, removeMember } from "@/lib/services/workspaces";
 import { AppError } from "@/lib/errors";
+import { verifySecret } from "@/lib/providers/verify";
+import { cleanSecret, deleteSecret, SECRET_NAMES, setSecret, type SecretName } from "@/lib/secrets";
 
 export type ActionResult = { ok: true; message?: string; id?: string; data?: unknown } | { ok: false; error: string };
 
@@ -280,9 +282,9 @@ export async function deleteDealAction(id: string): Promise<ActionResult> {
 
 export async function startDiscoveryAction(query: string): Promise<ActionResult> {
   return run(async (_c, scope) => {
-    getAiProvider(); // fail fast with a clear message if keys are missing
+    await getAiProvider(scope.workspaceId); // fail fast with a clear message if keys are missing
     const { getSearchProvider } = await import("@/lib/providers/search");
-    getSearchProvider();
+    await getSearchProvider(scope.workspaceId);
     const r = await createDiscoveryRun(scope, query);
     return { id: r.id };
   });
@@ -290,7 +292,7 @@ export async function startDiscoveryAction(query: string): Promise<ActionResult>
 
 export async function generateOutreachAction(prospectId: string, input: { instruction: string; contactId?: string | null; draftId?: string | null }): Promise<ActionResult> {
   return run(async (_c, scope) => {
-    const draft = await generateOutreach(scope, prospectId, input, getAiProvider());
+    const draft = await generateOutreach(scope, prospectId, input, await getAiProvider(scope.workspaceId));
     return { id: draft.id, data: { subject: draft.subject, body: draft.body, id: draft.id } };
   });
 }
@@ -304,6 +306,41 @@ export async function updateDraftAction(id: string, input: { subject?: string; b
 
 export async function deleteDraftAction(id: string): Promise<ActionResult> {
   return run(async (_c, scope) => deleteDraft(scope, id));
+}
+
+/* ---- integrations (API keys) ---- */
+
+const SECRET_LABEL: Record<SecretName, string> = { openai_api_key: "OpenAI", tavily_api_key: "Tavily" };
+
+export async function saveSecretAction(name: SecretName, _prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async (ctx) => {
+    requireAdmin(ctx);
+    if (!SECRET_NAMES.includes(name)) throw new AppError("validation", "Unknown setting.");
+    const value = cleanSecret(String(fd.get("value") ?? ""));
+    if (value.length < 12 || value.length > 400) throw new AppError("validation", `That doesn't look like a ${SECRET_LABEL[name]} API key. Paste the whole key.`);
+    let warning = "";
+    try {
+      await verifySecret(name, value);
+    } catch (err) {
+      if (err instanceof AppError && err.kind === "provider_auth") {
+        throw new AppError("validation", `${SECRET_LABEL[name]} rejected that key. Check you copied all of it, then try again.`);
+      }
+      warning = ` Saved, but ${SECRET_LABEL[name]} could not be reached to check it just now.`;
+    }
+    await setSecret(ctx.workspace.id, ctx.user.id, name, value);
+    await db.insert(schema.auditLog).values({ workspaceId: ctx.workspace.id, userId: ctx.user.id, action: "secret.saved", entityType: "secret", entityId: name });
+    return { message: warning ? `${SECRET_LABEL[name]} key saved.${warning}` : `${SECRET_LABEL[name]} key saved and verified.` };
+  });
+}
+
+export async function removeSecretAction(name: SecretName): Promise<ActionResult> {
+  return run(async (ctx) => {
+    requireAdmin(ctx);
+    if (!SECRET_NAMES.includes(name)) throw new AppError("validation", "Unknown setting.");
+    await deleteSecret(ctx.workspace.id, name);
+    await db.insert(schema.auditLog).values({ workspaceId: ctx.workspace.id, userId: ctx.user.id, action: "secret.removed", entityType: "secret", entityId: name });
+    return { message: "Key removed." };
+  });
 }
 
 /* ---- team ---- */

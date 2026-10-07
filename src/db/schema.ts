@@ -415,6 +415,20 @@ export const aiMessages = pgTable(
   (t) => [index("aim_conv_idx").on(t.conversationId, t.createdAt)],
 );
 
+/** Workspace-level API keys entered in Settings. Stored AES-256-GCM encrypted; plaintext never leaves the server. */
+export const workspaceSecrets = pgTable(
+  "workspace_secrets",
+  {
+    workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    ciphertext: text("ciphertext").notNull(),
+    last4: text("last4").notNull(),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.name] })],
+);
+
 /* ---------- Background jobs ---------- */
 
 export const jobs = pgTable(

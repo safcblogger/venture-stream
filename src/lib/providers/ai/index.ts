@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AppError } from "@/lib/errors";
 import { env } from "@/lib/env";
 import { fetchJson } from "@/lib/http";
+import { getSecret } from "@/lib/secrets";
 
 export type ChatMessage =
   | { role: "system" | "user"; content: string }
@@ -85,12 +86,14 @@ class OpenAiProvider implements AiProvider {
 
 export { OpenAiProvider };
 
-export function getAiProvider(): AiProvider {
-  const { AI_PROVIDER, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL } = env();
+/** A key saved in Settings → Integrations wins over the server environment variable. */
+export async function getAiProvider(workspaceId?: string): Promise<AiProvider> {
+  const { AI_PROVIDER, OPENAI_MODEL, OPENAI_BASE_URL } = env();
+  const OPENAI_API_KEY = (workspaceId ? await getSecret(workspaceId, "openai_api_key") : null) ?? env().OPENAI_API_KEY;
   switch (AI_PROVIDER) {
     case "openai":
       if (!OPENAI_API_KEY) {
-        throw new AppError("not_configured", "The AI provider is not configured. Set OPENAI_API_KEY on the server to enable AI features.");
+        throw new AppError("not_configured", "The AI provider is not configured. Add your OpenAI API key in Settings → Integrations to enable AI features.");
       }
       return new OpenAiProvider(OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL);
     default:

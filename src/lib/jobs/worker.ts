@@ -32,11 +32,13 @@ export async function runJob(job: Job, deps: ResearchDeps) {
 const PERMANENT = new Set(["provider_auth", "not_configured", "not_found", "validation"]);
 
 /** Process one job. Returns false when the queue is empty. */
-export async function processNextJob(makeDeps: () => ResearchDeps = () => ({ ai: getAiProvider(), search: getSearchProvider() })) {
+export async function processNextJob(
+  makeDeps: (workspaceId: string) => ResearchDeps | Promise<ResearchDeps> = async (ws) => ({ ai: await getAiProvider(ws), search: await getSearchProvider(ws) }),
+) {
   const job = await claimJob();
   if (!job) return false;
   try {
-    await runJob(job, makeDeps());
+    await runJob(job, await makeDeps(job.workspaceId ?? ""));
     await completeJob(job.id);
   } catch (err) {
     const { message, kind } = toUserMessage(err);

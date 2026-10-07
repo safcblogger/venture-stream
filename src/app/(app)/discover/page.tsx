@@ -3,7 +3,7 @@ import { AutoRefresh } from "@/components/client-bits";
 import { DiscoverForm } from "@/components/discover-form";
 import { Empty, PageHead, Score } from "@/components/ui";
 import { requireContext } from "@/lib/auth";
-import { env } from "@/lib/env";
+import { secretStatus } from "@/lib/secrets";
 import { safeHref, timeAgo } from "@/lib/format";
 import { listDiscoveryRuns } from "@/lib/research/discovery";
 
@@ -12,8 +12,8 @@ export const metadata = { title: "Discover" };
 export default async function DiscoverPage() {
   const ctx = await requireContext();
   const runs = await listDiscoveryRuns({ workspaceId: ctx.workspace.id, userId: ctx.user.id });
-  const e = env();
-  const missing = [!e.OPENAI_API_KEY && "OPENAI_API_KEY", !e.TAVILY_API_KEY && "TAVILY_API_KEY"].filter(Boolean) as string[];
+  const status = await secretStatus(ctx.workspace.id);
+  const missing = [!status.openai_api_key.source && "an OpenAI key", !status.tavily_api_key.source && "a Tavily key"].filter(Boolean) as string[];
   const active = runs.some((r) => r.status === "queued" || r.status === "running") || runs.some((r) => r.prospects.some((p) => p.researchStatus === "queued" || p.researchStatus === "running"));
 
   return (
@@ -21,7 +21,7 @@ export default async function DiscoverPage() {
       <PageHead title="Discover" sub="Describe who you want to sell to. Venture Stream searches the web, verifies each company against its sources, then researches it."><AutoRefresh active={active} /></PageHead>
       {missing.length > 0 && (
         <div className="alert error" style={{ marginBottom: 12 }}>
-          Discovery needs {missing.join(" and ")} to be set in the server environment. See <code>.env.example</code>.
+          Discovery needs {missing.join(" and ")}. <Link href="/settings">Add it in Settings → Integrations</Link>.
         </div>
       )}
       <DiscoverForm />
